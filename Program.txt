@@ -1,0 +1,138 @@
+//========================= SEND =============================
+
+#define RXD2 16 // กำหนดขา RXD2 ที่ใช้รับข้อมูล
+#define TXD2 17 // กำหนดขา TXD2 ที่ใช้ส่งข้อมูล
+
+void setup() {
+  Serial.begin(9600); // เริ่มต้นการสื่อสารผ่านพอร์ต Serial ที่ 9600 บิตต่อวินาที
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2); // เริ่มต้นการสื่อสารผ่านพอร์ต Serial2 ที่ 9600 บิตต่อวินาที โดยใช้ 8N1 (8 บิตข้อมูล, No parity, 1 บิตหยุด)
+  Serial.println("NODE"); // พิมพ์ข้อความ "NODE" ไปยัง Serial
+}
+
+char out = 'C'; // กำหนดตัวแปร char ชื่อ out และกำหนดค่าให้เป็น 'C'
+
+void loop() { 
+    Serial2.write(out); // ส่งค่าตัวแปร out ผ่านพอร์ต Serial2
+    delay(1000); // รอเป็นเวลา 1 วินาที
+}
+
+
+//========================= RESIVE =============================
+
+#include <Arduino.h> // การเรียกใช้ไลบรารี Arduino สำหรับโปรเจกต์ Arduino
+#if defined(ESP8266) // เช็คว่าเรากำลังใช้ไมโครคอนโทรลเลอร์ ESP8266
+#include <ESP8266WiFi.h> // ไลบรารีสำหรับการเชื่อมต่อ Wi-Fi บน ESP8266
+#include <ESPAsyncTCP.h> // ไลบรารีสำหรับการสื่อสาร TCP บน ESP8266
+#elif defined(ESP32) // เช็คว่าเรากำลังใช้ไมโครคอนโทรลเลอร์ ESP32
+#include <WiFi.h> // ไลบรารีสำหรับการเชื่อมต่อ Wi-Fi บน ESP32
+#include <AsyncTCP.h> // ไลบรารีสำหรับการสื่อสาร TCP บน ESP32
+#endif
+#include <ESPAsyncWebServer.h> // ไลบรารีสำหรับสร้างเว็บเซิร์ฟเวอร์บน ESP
+#include <WebSerial.h> // ไลบรารีสำหรับการรับส่งข้อมูลผ่านเว็บ
+
+AsyncWebServer server(80); // สร้างเซิร์ฟเวอร์บนพอร์ต 80
+
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 // ความกว้างของหน้าจอ OLED, ในพิกเซล
+#define SCREEN_HEIGHT 32 // ความสูงของหน้าจอ OLED, ในพิกเซล
+#define OLED_RESET 4 // ขารีเซ็ตของหน้าจอ OLED (หรือ -1 หากใช้ขารีเซ็ตของ Arduino)
+#define SCREEN_ADDRESS 0x3C // ที่อยู่ I2C ของหน้าจอ OLED (ดูในข้อมูลชีท)
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET); // สร้างอ็อบเจกต์สำหรับควบคุมหน้าจอ OLED
+
+#define NUMFLAKES 10 // จำนวนเม็ดหิมะในตัวอย่างการแอนิเมชัน
+#define LOGO_HEIGHT 16
+#define LOGO_WIDTH 16
+
+#define RXD2 16 // ขา RXD2 สำหรับการรับข้อมูล
+#define TXD2 17 // ขา TXD2 สำหรับการส่งข้อมูล
+
+const char* ssid = "POWER_LINE. #CHECK# Vol.1"; // ชื่อ SSID ของเครือข่าย Wi-Fi ของคุณ
+const char* password = ""; // รหัสผ่านของเครือข่าย Wi-Fi ของคุณ
+
+void recvMsg(uint8_t *data, size_t len) {
+  WebSerial.println("Received Data..."); // พิมพ์ข้อความ "Received Data..." ไปยังเซิร์ฟเวอร์เว็บ
+  String d = "";
+  for (int i = 0; i < len; i++) {
+    d += char(data[i]);
+  }
+  WebSerial.println(d); // พิมพ์ข้อมูลที่รับมาจากเว็บไปยังเซิร์ฟเวอร์เว็บ
+}
+
+char input = 'X'; // ตัวแปร input ใช้เก็บข้อมูลที่รับเข้ามาผ่าน Serial2
+String web = "";
+
+void testscrolltext(void) {
+  display.clearDisplay(); // เคลียร์หน้าจอ OLED
+  display.setTextSize(1); // ตั้งขนาดตัวอักษร
+  display.setTextColor(SSD1306_WHITE); // ตั้งสีของตัวอักษร
+  display.setCursor(0, 0); // ตั้งตำแหน่งเริ่มต้นของตัวอักษร
+  display.println(F("192.168.4.1/webserial")); // พิมพ์ข้อความลงบนหน้าจอ OLED
+
+  display.setTextSize(3); // ตั้งขนาดตัวอักษรใหม่
+  display.setTextColor(SSD1306_WHITE); // ตั้งสีของตัวอักษรใหม่
+  display.setCursor(0, 10); // ตั้งตำแหน่งเริ่มต้นของตัวอักษรใหม่
+  display.print(millis() % 100); // พิมพ์เวลาที่ผ่านไปในรูปแบบมิลลิวินาที
+  display.print(" > "); // พิมพ์เครื่องหมาย > ลงบนหน้าจอ
+  display.print(input); // พิมพ์ค่าตัวแปร input ลงบนหน้าจอ
+  display.display(); // แสดงข้อมูลบนหน้าจอ OLED
+}
+
+void setup() {
+  Serial.begin(9600); // เริ่มต้นการสื่อสารทางซีเรียล บอร์ด Arduino
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2); // เริ่มต้นการสื่อสารทางซีเรียล บอร์ดที่ Serial2
+  Serial.println("MASTER_READ"); // พิมพ์ข้อความ "MASTER_READ" ไปยังซีเรียล
+
+  WiFi.softAP(ssid, password); // ตั้งค่า ESP8266 เป็น Access Point (AP) โดยใช้ชื่อ SSID และรหัสผ่านที่ระบุ
+
+  IPAddress IP = WiFi.softAPIP(); // ดึง IP address ของ Access Point
+  Serial.print("AP IP address: ");
+  Serial.println(IP); // พิมพ์ IP address ของ Access Point ไปยังซีเรียล
+
+  WebSerial.begin(&server); // เริ่มต้นการใช้งาน WebSerial Library และเชื่อมต่อกับเซิร์ฟเวอร์เว็บ
+  WebSerial.msgCallback(recvMsg); // กำหนดฟังก์ชันของการรับข้อมูลจากเว็บ
+  server.begin(); // เริ่มต้นเซิร์ฟเวอร์
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;); // หยุดการทำงานของโปรแกรมถาวรหากไม่สามารถเริ่มต้นหน้าจอ OLED ได้
+  }
+  display.display(); // แสดงหน้าจอ OLED
+  delay(2000); // รอสักครู่
+  display.clearDisplay(); // เคลียร์หน้าจอ OLED
+  display.drawPixel(10, 10, SSD1306_WHITE); // วาดพิกเซลสีขาวที่ตำแหน่ง (10, 10)
+  display.display(); // แสดงผลบนหน้าจอ OLED
+
+  testscrolltext(); // เรียกใช้งานฟังก์ชัน testscrolltext เพื่อแสดงข้อมูลเริ่มต้นบนหน้าจอ OLED
+}
+int count = 0; // ตัวแปร count ใช้นับจำนวนรอบที่ไม่มีข้อมูลเข้ามา
+
+void loop() {
+  
+  if (Serial2.available()) { // ตรวจสอบว่ามีข้อมูลเข้ามาที่ Serial2 หรือไม่
+    input = Serial2.read(); // อ่านข้อมูลจาก Serial2
+    Serial.println(input); // พิมพ์ข้อมูลที่รับเข้ามาไปยังซีเรียล
+    testscrolltext(); // เรียกใช้งานฟังก์ชัน testscrolltext เพื่อแสดงข้อมูลบนหน้าจอ OLED
+    WebSerial.print(millis() % 100); // พิมพ์เวลาที่ผ่านไปในรูปแบบมิลลิวินาที
+    WebSerial.print("\t>>>\t"); // พิมพ์เครื่องหมาย >>> และ tab
+    WebSerial.println(input); // พิมพ์ข้อมูลที่รับเข้ามาไปยังเซิร์ฟเวอร์เว็บ
+    count = 0; // รีเซ็ตตัวแปร count เป็น 0
+  } else {
+    count++; // เพิ่มค่าตัวแปร count ขึ้น
+    delay(200); // รอสักครู่
+  }
+  
+  if (count > 20) { // ถ้าค่าของ count มากกว่า 20 (คือไม่มีข้อมูลเข้ามาเป็นเวลานาน)
+    input = 'X'; // กำหนดค่าตัวแปร input เป็น 'X'
+    testscrolltext(); // เรียกใช้งานฟังก์ชัน testscrolltext เพื่อแสดงข้อมูลบนหน้าจอ OLED
+    WebSerial.print(millis() % 100); // พิมพ์เวลาที่ผ่านไปในรูปแบบมิลลิวินาที
+    WebSerial.print("\t>>>\t"); // พิมพ์เครื่องหมาย >>> และ tab
+    WebSerial.println(input); // พิมพ์ค่าตัวแปร input ไปยังเซิร์ฟเวอร์เว็บ
+    delay(1000); // รอสักครู่
+  }
+  
+}
